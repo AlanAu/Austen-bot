@@ -16,19 +16,20 @@ I left quotation marks in and will have to deal with them.
 I'm going to deal with the "Chapter" headings separately.
 '''
 
-pp_dict = {} #to hold follow-up words
+pp_dict = {} #to hold follow-up words in general prose
+pp_quote = {} #to hold follow-up words within quotations
 pp_first = [] #to hold "first" words
 
-inFile = open("pride_and_prejudice.txt",'r') #here's the training data
-outFile = open("pp_output.txt",'w') #here's the resulting file
+inFile = open("pride_and_prejudice.txt", 'r', encoding="utf8") #here's the training data
+outFile = open("pp_output.txt", 'w', encoding="utf8") #here's the resulting file
 pp = inFile.readlines()
-
-para_length = []
 
 #load up the hash table
 for paragraph in pp:
     words = paragraph.strip().split()
-    para_length.append(len(words))
+    len_words = len(words)
+    if len_words == 0: continue #don't bother indexing empty paragraphs
+    in_quote = False
     #go from the first to second-to-last word in the paragraph
     for i in range(len(words)-1):
         current = words[i]
@@ -39,19 +40,21 @@ for paragraph in pp:
             pp_first.append(current)
         
         #map the current word to its next word(s)
-        if current in pp_dict:
-            pp_dict[current].append(next)
+        if '“' in current: in_quote = True
+        if '”' in current: in_quote = False #in case of one-word quotes, this will revert to False
+        if in_quote:
+            if current in pp_quote: pp_quote[current].append(next)
+            else: pp_quote[current] = [next]
         else:
-            pp_dict[current] = [next]
-
-avg_paragraph = int(float(sum(para_length)/len(para_length)))
-#print("The average paragraph contains "+str(avg_paragraph)+" words.") #The average paragraph contains 57 words.
+            if current in pp_dict: pp_dict[current].append(next)
+            else: pp_dict[current] = [next]
+            
 print("Done reading input--let's write some stories!")
 
 #okay, let's write some stories!
 fullstory = True
-min_sentences = 3 #minimum number of paragraphs in a chapter
-min_words = 2
+min_sentences = 1 #minimum number of sentences in a chapter
+min_words = 1 #minimum number of words in a sentence
 sentences = 0
 words = 0
 
@@ -67,30 +70,28 @@ print("We're going to write a "+str(chapters)+"-chapter story.")
 in_quote = False
 while chapter <= chapters:
     start = random.sample(pp_first,1)
+    if '“' in start[0]: in_quote = True
+    if '”' in start[0]: in_quote = False
     output = [start[0]]
     #chapter headings
     if start[0] == "Chapter":
-        if chapter == chapters: #stop when we would have gone beyond the last chapter
-            break
-        if sentences < min_sentences: #make sure chapters are some minimum length
-            continue
-        output.append(str(chapter))
+        #stop when we would have gone beyond the last chapter
         chapter += 1
-        print("Now writing chapter "+str(chapter))
-        sentences = 0
+        if chapter > chapters: break
+        output.append(str(chapter))
     #everything else
     else:
-        sentences += 1
-        words = 0
         current = start[0]
         while True:
-            if current in pp_dict:
+            if in_quote and current in pp_quote:
+                next = random.sample(pp_quote[current],1)
+            elif current in pp_dict:
                 next = random.sample(pp_dict[current],1)
-            elif words < min_words:
-                next = random.sample(pp_first,1)
             else:
+                in_quote = False
                 break
             output.append(next[0])
             current = next[0]
-            words += 1
+            if '“' in current: in_quote = True
+            if '”' in current: in_quote = False
     outFile.write('\n'+' '.join(output)+'\n')
