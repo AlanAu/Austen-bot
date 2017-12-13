@@ -11,7 +11,7 @@ The text has been cleaned up, so that each line of the file contains the text of
 
 It uses Python lists to store the "first" words in each sentences, and a hash table to store list of follow-up words for every term in the text. Note that the use of lists means that I get frequency weighting for free. Yay!
 
-I left quotation marks in and will have to deal with them.
+I left quotations in and deal with them differently than exposition text.
 
 I'm going to deal with the "Chapter" headings separately.
 '''
@@ -19,12 +19,13 @@ I'm going to deal with the "Chapter" headings separately.
 pp_dict = {} #to hold follow-up words in general prose
 pp_quote = {} #to hold follow-up words within quotations
 pp_first = [] #to hold "first" words
+pp_title = {} #to hold potential "title" words
 
 inFile = open("pride_and_prejudice.txt", 'r', encoding="utf8") #here's the training data
 outFile = open("pp_output.txt", 'w', encoding="utf8") #here's the resulting file
 pp = inFile.readlines()
 
-#load up the hash table
+#load up the hash tables
 for paragraph in pp:
     words = paragraph.strip().split()
     len_words = len(words)
@@ -35,9 +36,13 @@ for paragraph in pp:
         current = words[i]
         next = words[i+1]
 
-        #store "first" words
-        if i == 0: 
-            pp_first.append(current)
+        if i == 0: pp_first.append(current) #store "first" words
+        if current[0].upper() == 'P': 
+            title_word = current.upper()
+            while title_word[-1] not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                title_word = title_word[:-1]
+            if title_word not in pp_title:
+                pp_title[title_word] = True
         
         #map the current word to its next word(s)
         if '“' in current: in_quote = True
@@ -49,24 +54,22 @@ for paragraph in pp:
             if current in pp_dict: pp_dict[current].append(next)
             else: pp_dict[current] = [next]
             
-print("Done reading input--let's write some stories!")
-
 #okay, let's write some stories!
-fullstory = True
-min_sentences = 1 #minimum number of sentences in a chapter
-min_words = 1 #minimum number of words in a sentence
-sentences = 0
-words = 0
+fullstory = True #can set this to False if you just want a single paragraph
 
 chapters = random.randint(1,61) #canonically, there are 61 chapters in "Pride and Prejudice"
 chapter = 1
 if fullstory:
-    outFile.write('Chapter 1\n') #always at least 1 chapter
+    title_words = random.sample(pp_title.keys(),2)
+    title = title_words[0]+" AND "+title_words[1]
+    outFile.write(title.upper()+'\n'+"by Austen-bot (https://github.com/AlanAu/Austen-bot)\n")
+    outFile.write('\nChapter 1\n')
 else:
     chapters = 1
 
-print("We're going to write a "+str(chapters)+"-chapter story.")
+print("Done reading input--let's write a "+str(chapters)+"-chapter story.")
 
+sentences = False
 in_quote = False
 while chapter <= chapters:
     start = random.sample(pp_first,1)
@@ -75,12 +78,15 @@ while chapter <= chapters:
     output = [start[0]]
     #chapter headings
     if start[0] == "Chapter":
+        if not sentences: continue #make sure there's at least 1 sentence in the chapter
         #stop when we would have gone beyond the last chapter
         chapter += 1
+        sentences = False
         if chapter > chapters: break
         output.append(str(chapter))
     #everything else
     else:
+        sentences = True
         current = start[0]
         while True:
             if in_quote and current in pp_quote:
@@ -88,7 +94,9 @@ while chapter <= chapters:
             elif current in pp_dict:
                 next = random.sample(pp_dict[current],1)
             else:
-                in_quote = False
+                if in_quote:
+                    in_quote = False
+                    output[-1] = output[-1]+'”'
                 break
             output.append(next[0])
             current = next[0]
